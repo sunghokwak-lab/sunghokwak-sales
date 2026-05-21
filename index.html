@@ -597,6 +597,7 @@ function renderCal() {
 }
 function selectDate(ds) {
   selectedDate = ds;
+  selectedCompDate = null; // 날짜 바뀌면 비교주 초기화 (직전주로 리셋)
   document.getElementById('dateDisp').textContent = formatDate(ds);
   closeCal(); renderInput(); renderHistScroll(); renderResult(ds); renderPredict();
 }
@@ -801,10 +802,17 @@ function renderResult(ds) {
 }
 
 // ── 전주 날짜 계산 ────────────────────────────────────
-function getLastWeekDate(dateStr) {
+function getWeeksAgo(dateStr, weeks) {
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() - 7);
+  d.setDate(d.getDate() - 7 * weeks);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+let selectedCompDate = null; // null = 직전주 (기본)
+
+function setCompDate(dateStr) {
+  selectedCompDate = dateStr;
+  renderPredict();
 }
 
 // ── 예측 렌더링 ───────────────────────────────────────
@@ -813,10 +821,15 @@ function renderPredict() {
   const dayData = getDayData(selectedDate);
   const hasBase = !!PRED_BY_WD[wd];
 
-  // 전주 데이터
-  const lastWeekDate = getLastWeekDate(selectedDate);
-  const lastWeekData = getDayData(lastWeekDate);
-  const hasLastWeek  = Object.keys(lastWeekData).length > 0;
+  // 비교 주 후보: 1~4주 전 동일 요일
+  const compCandidates = [1,2,3,4].map(w => getWeeksAgo(selectedDate, w));
+  // 기본값: 직전주
+  if (!selectedCompDate || !compCandidates.includes(selectedCompDate)) {
+    selectedCompDate = compCandidates[0];
+  }
+  const compDate = selectedCompDate;
+  const compData = getDayData(compDate);
+  const hasComp  = Object.keys(compData).length > 0;
 
   let html = `<div class="section-label" style="margin-top:4px">${formatDate(selectedDate)} — ${wd}요일 예측</div>`;
 
@@ -826,7 +839,30 @@ function renderPredict() {
     return;
   }
 
-  // 예측 출처 안내
+  // ── 비교 주 선택 버튼 ─────────────────────────────
+  html += `<div style="margin-bottom:12px;">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;">비교 기준 주 선택</div>
+    <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">`;
+  for (let w=1; w<=4; w++) {
+    const cd = compCandidates[w-1];
+    const cdData = getDayData(cd);
+    const hasData = Object.keys(cdData).length > 0;
+    const isActive = cd === compDate;
+    const label = w===1 ? `직전주<br>${formatDate(cd)}` : `${w}주전<br>${formatDate(cd)}`;
+    html += `<div onclick="${hasData?`setCompDate('${cd}')`:''}"
+      style="flex-shrink:0;padding:7px 12px;border-radius:10px;text-align:center;
+        font-size:11px;font-weight:600;cursor:${hasData?'pointer':'default'};
+        line-height:1.5;
+        background:${isActive?'var(--acc)':hasData?'var(--bg2)':'var(--bg3)'};
+        border:1px solid ${isActive?'var(--acc)':hasData?'var(--border)':'var(--border)'};
+        color:${isActive?'#fff':hasData?'var(--text)':'var(--text3)'};
+        opacity:${hasData?1:0.45};">
+      ${label}${hasData?'':' <span style="font-size:9px">없음</span>'}
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // ── 예측 출처 안내 ────────────────────────────────
   const acc = loadAccAvg();
   const finalAcc = acc[wd]?.['최종'];
   const accN = finalAcc?.skt?.length || 0;
@@ -836,7 +872,7 @@ function renderPredict() {
     display:flex;align-items:center;justify-content:space-between;">
     <span>${usingCustom
       ? `📊 내 누적 데이터 기준 (${accN}일)`
-      : `📋 기본 평균 기준${accN>0?' (누적 '+accN+'일, 3일 이상이면 전환)':''}`
+      : `📋 기본 평균 기준${accN>0?` (누적 ${accN}일, 3일 이상이면 전환)`:''}`
     }</span>
     ${usingCustom ? '<span style="color:var(--up);font-weight:600">✓ 보정됨</span>' : ''}
   </div>`;
@@ -845,10 +881,10 @@ function renderPredict() {
   for (const slot of ['12:00','14:00','16:00','18:00','최종']) {
     const p = getPred(wd, slot);
     if (!p) continue;
-    const actual   = dayData[slot];
-    const lastWeek = lastWeekData[slot];
-    const actualTot   = actual   ? (actual.skt||0)+(actual.kt||0)+(actual.up||0)+(actual.mvno||0)   : null;
-    const lastWeekTot = lastWeek ? (lastWeek.skt||0)+(lastWeek.kt||0)+(lastWeek.up||0)+(lastWeek.mvno||0) : null;
+    const actual  = dayData[slot];
+    const compSlot= compData[slot];
+    const actualTot  = actual   ? (actual.skt||0)+(actual.kt||0)+(actual.up||0)+(actual.mvno||0)    : null;
+    const compTot    = compSlot ? (compSlot.skt||0)+(compSlot.kt||0)+(compSlot.up||0)+(compSlot.mvno||0) : null;
 
     html += `<div class="pred-card">
       <div class="pred-header">
@@ -857,29 +893,26 @@ function renderPredict() {
       </div>
       <div class="pred-body">`;
 
-    // ── 비교 테이블: 전주 / 예측 / 차이(예측-전주) / 실제 / 차이(실제-예측) ──
-    html += `<div style="width:100%;border-collapse:collapse;display:table;font-size:12px;margin-bottom:8px;">`;
-
     // 헤더
     html += `<div style="display:grid;grid-template-columns:20px repeat(5,1fr);gap:2px;margin-bottom:6px;">`;
     html += `<div></div>`;
-    const hdrs = ['전주','예측','예측차이','실제','실제차이'];
-    const hclrs= ['var(--text3)','var(--acc)','var(--text2)','var(--up)','var(--text2)'];
+    const hdrs  = ['비교주','예측','예측차이','실제','실제차이'];
+    const hclrs = ['var(--text3)','var(--acc)','var(--text2)','var(--up)','var(--text2)'];
     for (let i=0;i<hdrs.length;i++) {
-      html += `<div style="text-align:center;font-size:10px;font-weight:600;color:${hclrs[i]};padding:3px 0;
-        border-bottom:1.5px solid ${hclrs[i]};">${hdrs[i]}</div>`;
+      html += `<div style="text-align:center;font-size:10px;font-weight:600;color:${hclrs[i]};
+        padding:3px 0;border-bottom:1.5px solid ${hclrs[i]};">${hdrs[i]}</div>`;
     }
     html += `</div>`;
 
     // 총합계 행
-    const predVsLw  = lastWeekTot != null ? p.total - lastWeekTot : null;
-    const actVsPred = actualTot   != null ? actualTot - p.total   : null;
+    const predVsComp = compTot    != null ? p.total   - compTot    : null;
+    const actVsPred  = actualTot  != null ? actualTot - p.total    : null;
     html += `<div style="display:grid;grid-template-columns:20px repeat(5,1fr);gap:2px;margin-bottom:10px;">`;
     html += `<div style="font-size:10px;font-weight:700;color:var(--text2);display:flex;align-items:center;">합</div>`;
-    html += colCell(lastWeekTot, 'var(--text2)', true);
-    html += colCell(p.total,     'var(--acc)',   true);
-    html += diffCell(predVsLw,   p.total);
-    html += colCell(actualTot,   'var(--up)',    true);
+    html += colCell(compTot,   'var(--text2)', true);
+    html += colCell(p.total,   'var(--acc)',   true);
+    html += diffCell(predVsComp, p.total);
+    html += colCell(actualTot, 'var(--up)',    true);
     html += diffCell(actVsPred,  p.total);
     html += `</div>`;
 
@@ -891,16 +924,16 @@ function renderPredict() {
     ];
     html += `<div style="display:flex;flex-direction:column;gap:5px;">`;
     for (const c of carriers) {
-      const lwV  = lastWeek?.[c.key] ?? null;
-      const pV   = p[c.key];
-      const acV  = actual?.[c.key]  ?? null;
-      const pvlw = lwV != null ? pV - lwV : null;
+      const cV  = compSlot?.[c.key] ?? null;
+      const pV  = p[c.key];
+      const acV = actual?.[c.key]   ?? null;
+      const pvlc = cV  != null ? pV  - cV  : null;
       const avp  = acV != null ? acV - pV  : null;
       html += `<div style="display:grid;grid-template-columns:20px repeat(5,1fr);gap:2px;align-items:center;">`;
       html += `<div style="font-size:10px;font-weight:700;color:${c.color}">${c.lbl}</div>`;
-      html += `<div style="text-align:center;font-size:11px;font-weight:600;color:${c.color}">${lwV??'-'}</div>`;
+      html += `<div style="text-align:center;font-size:11px;font-weight:600;color:${c.color}">${cV??'-'}</div>`;
       html += `<div style="text-align:center;font-size:11px;color:var(--text2)">${pV}</div>`;
-      html += smallDiff(pvlw);
+      html += smallDiff(pvlc);
       html += `<div style="text-align:center;font-size:11px;font-weight:600;color:${c.color}">${acV??'-'}</div>`;
       html += smallDiff(avp);
       html += `</div>`;
@@ -911,10 +944,10 @@ function renderPredict() {
     html += `</div>`; // pred-card
   }
 
-  // 전주 데이터 없으면 안내
-  if (!hasLastWeek) {
+  // 비교 데이터 없으면 안내
+  if (!hasComp) {
     html += `<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:4px;padding:8px">
-      💡 전주(${formatDate(lastWeekDate)}) 실적을 입력하면 비교가 표시됩니다
+      💡 ${formatDate(compDate)} 실적 데이터가 없습니다
     </div>`;
   }
 
