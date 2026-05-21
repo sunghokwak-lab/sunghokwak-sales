@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f0f13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>개통현황</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg:     light-dark(#f2f3f7, #0d0d12);
+  --bg2:    light-dark(#ffffff, #18181f);
+  --bg3:    light-dark(#e8eaf0, #22222c);
+  --border: light-dark(#d4d6e2, #2c2c3a);
+  --text:   light-dark(#18182a, #eeeef8);
+  --text2:  light-dark(#5c5c7c, #8080a0);
+  --text3:  light-dark(#9090aa, #484860);
+  --skt:  #e03232;
+  --kt:   #1c5fd4;
+  --up:   #16a84e;
+  --mvno: #8a30c8;
+  --tot:  #d06010;
+  --acc:  light-dark(#2c4ed8, #4c6eff);
+  --acc2: light-dark(rgba(44,78,216,0.08), rgba(76,110,255,0.12));
+  --shadow: light-dark(0 2px 16px rgba(0,0,0,0.07), 0 2px 16px rgba(0,0,0,0.4));
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+}
+
+/* ── 헤더 ── */
+header {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex; align-items: center; height: 52px;
+  gap: 12px;
+}
+.logo { font-size: 17px; font-weight: 700; letter-spacing: -0.5px; flex: 1; }
+.logo em { font-style: normal; color: var(--acc); }
+.date-disp {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; color: var(--text2); cursor: pointer;
+  padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg3);
+}
+
+/* ── 날짜 선택 모달 ── */
+.modal-bg {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.5); align-items: flex-end;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--bg2); border-radius: 20px 20px 0 0;
+  padding: 20px 16px 36px; width: 100%; max-height: 70dvh;
+  overflow-y: auto;
+}
+.modal-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7,1fr); gap: 4px;
+  margin-bottom: 8px;
+}
+.cal-wd {
+  text-align: center; font-size: 11px; font-weight: 600;
+  color: var(--text3); padding: 4px 0;
+}
+.cal-wd:first-child { color: var(--skt); }
+.cal-wd:last-child { color: var(--kt); }
+.cal-day {
+  text-align: center; padding: 9px 2px; border-radius: 10px;
+  font-size: 13px; cursor: pointer; transition: background 0.1s;
+  position: relative;
+}
+.cal-day:hover { background: var(--bg3); }
+.cal-day.selected { background: var(--acc); color: #fff; font-weight: 700; }
+.cal-day.today::after {
+  content: ''; position: absolute; bottom: 3px; left: 50%;
+  transform: translateX(-50%); width: 4px; height: 4px;
+  border-radius: 50%; background: var(--acc);
+}
+.cal-day.selected.today::after { background: #fff; }
+.cal-day.empty { cursor: default; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-nav button {
+  background: var(--bg3); border: none; border-radius: 8px;
+  padding: 7px 14px; font-size: 14px; cursor: pointer; color: var(--text);
+}
+.cal-month { font-size: 15px; font-weight: 600; }
+
+/* ── 탭 ── */
+.tabs {
+  display: flex; background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 52px; z-index: 100;
+}
+.tab {
+  flex: 1; text-align: center; padding: 11px 4px;
+  font-size: 13px; font-weight: 500; color: var(--text2);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; margin-bottom: -1px;
+}
+.tab.active { color: var(--acc); border-bottom-color: var(--acc); font-weight: 700; }
+
+/* ── 메인 ── */
+main { padding: 16px; max-width: 480px; margin: 0 auto; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── 입력 카드 ── */
+.slot-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; margin-bottom: 12px; overflow: hidden;
+  box-shadow: var(--shadow); transition: border-color 0.2s;
+}
+.slot-card.has-data { border-color: var(--acc); }
+.slot-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.slot-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 600; color: var(--acc);
+}
+.slot-card.final .slot-time { color: var(--tot); }
+.slot-total {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 700;
+}
+.slot-arrow { color: var(--text3); transition: transform 0.2s; font-size: 12px; }
+.slot-card.open .slot-arrow { transform: rotate(180deg); }
+
+.slot-body { display: none; padding: 14px 16px; }
+.slot-card.open .slot-body { display: block; }
+
+.input-grid {
+  display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;
+}
+.input-group { display: flex; flex-direction: column; gap: 5px; }
+.input-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+}
+.lbl-skt  { color: var(--skt); }
+.lbl-kt   { color: var(--kt); }
+.lbl-up   { color: var(--up); }
+.lbl-mvno { color: var(--mvno); }
+.lbl-tot  { color: var(--tot); }
+
+.num-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 600;
+  background: var(--bg3); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; color: var(--text);
+  text-align: right; width: 100%;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+}
+.num-input::-webkit-inner-spin-button,
+.num-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.num-input:focus { outline: none; border-color: var(--acc); }
+.num-input::placeholder { color: var(--text3); font-size: 14px; }
+
+/* 총합 자동계산 표시 */
+.auto-total {
+  grid-column: span 2;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--acc2); border-radius: 10px; padding: 10px 14px;
+  margin-top: 4px;
+}
+.auto-label { font-size: 12px; color: var(--text2); }
+.auto-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px; font-weight: 700; color: var(--acc);
+}
+
+/* 저장 버튼 */
+.save-btn {
+  width: 100%; margin-top: 10px; padding: 12px;
+  background: var(--acc); color: #fff; border: none;
+  border-radius: 10px; font-size: 14px; font-weight: 600;
+  font-family: inherit; cursor: pointer; transition: opacity 0.15s;
+}
+.save-btn:hover { opacity: 0.88; }
+.save-btn:active { opacity: 0.75; }
+
+/* ── 결과 섹션 ── */
+.result-section { margin-top: 4px; }
+.section-label {
+  font-size: 11px; font-weight: 600; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 0.8px; margin: 20px 0 10px;
+}
+
+/* 요약 카드 */
+.summary-row {
+  display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;
+  margin-bottom: 10px;
+}
+.s-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 13px 15px; box-shadow: var(--shadow);
+}
+.s-card.wide { grid-column: span 2; }
+.s-lbl { font-size: 11px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+.s-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px; font-weight: 700; letter-spacing: -1px;
+}
+.s-card.skt .s-val { color: var(--skt); }
+.s-card.kt  .s-val { color: var(--kt); }
+.s-card.up  .s-val { color: var(--up); }
+.s-card.tot .s-val { color: var(--tot); }
+.s-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+/* 시간대 타임라인 */
+.timeline { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.tl-row {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+  box-shadow: var(--shadow);
+}
+.tl-row.final { border-left: 3px solid var(--tot); }
+.tl-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600; color: var(--acc);
+  padding-top: 2px; flex-shrink: 0; width: 46px;
+}
+.tl-row.final .tl-time { color: var(--tot); }
+.tl-body { flex: 1; }
+.tl-total {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px; font-weight: 700; margin-bottom: 7px;
+}
+.bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.bar-lbl { font-size: 10px; color: var(--text2); width: 28px; flex-shrink: 0; font-weight: 600; }
+.bar-bg { flex: 1; height: 7px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+.bar-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text2); width: 32px; text-align: right; }
+
+/* 예측 비교 배지 */
+.diff-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 5px; margin-left: 6px;
+  font-family: 'JetBrains Mono', monospace; vertical-align: middle;
+}
+.diff-pos { background: rgba(224,50,50,0.12); color: var(--skt); }
+.diff-neg { background: rgba(22,168,78,0.12); color: var(--up); }
+.diff-flat { background: var(--bg3); color: var(--text3); }
+
+/* ── 예측 탭 ── */
+.pred-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+.pred-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.pred-slot { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: var(--acc); }
+.pred-total { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--acc); }
+.pred-body { padding: 12px 16px; }
+.pred-compare {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+  margin-bottom: 10px;
+}
+.pc-item { text-align: center; }
+.pc-lbl { font-size: 10px; color: var(--text2); margin-bottom: 3px; font-weight: 600; }
+.pc-row { display: flex; flex-direction: column; gap: 2px; }
+.pc-pred { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); }
+.pc-actual { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; }
+.pc-diff { font-size: 11px; font-weight: 600; }
+.pc-diff.pos { color: var(--skt); }
+.pc-diff.neg { color: var(--up); }
+.no-actual { font-size: 12px; color: var(--text3); text-align: center; padding: 6px; }
+
+/* 예측 vs 실제 총합 큰 비교 */
+.big-compare {
+  display: flex; gap: 10px; margin-bottom: 8px;
+}
+.bc-item {
+  flex: 1; text-align: center; padding: 10px;
+  border-radius: 10px;
+}
+.bc-item.pred { background: var(--acc2); }
+.bc-item.actual { background: rgba(22,168,78,0.08); }
+.bc-lbl { font-size: 10px; color: var(--text2); margin-bottom: 4px; }
+.bc-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+.bc-item.pred .bc-val { color: var(--acc); }
+.bc-item.actual .bc-val { color: var(--up); }
+
+/* ── 요일 평균 탭 ── */
+.wd-tabs {
+  display: flex; gap: 6px; overflow-x: auto;
+  scrollbar-width: none; padding-bottom: 4px; margin-bottom: 14px;
+}
+.wd-tabs::-webkit-scrollbar { display: none; }
+.wd-chip {
+  flex-shrink: 0; padding: 7px 14px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.wd-chip.active { background: var(--acc); border-color: var(--acc); color: #fff; }
+.wd-chip.sat { color: var(--kt); }
+.wd-chip.sun { color: var(--skt); }
+
+.avg-slot-row {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 13px 16px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  box-shadow: var(--shadow);
+}
+.avg-slot-left .avg-slot-time { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; color: var(--acc); }
+.avg-slot-left .avg-n { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.avg-slot-right .avg-total { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; }
+.avg-carriers { display: flex; gap: 10px; margin-top: 6px; }
+.avg-c { font-size: 11px; font-weight: 500; }
+
+/* 전체 요일 비교 */
+.wd-compare-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+}
+.wd-compare-row:last-child { border-bottom: none; }
+.wc-wd { width: 22px; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.wc-bar-bg { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+.wc-bar { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+.wc-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; width: 50px; text-align: right; }
+.wc-n { font-size: 10px; color: var(--text3); width: 24px; }
+
+/* ── 빈 상태 ── */
+.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty p { font-size: 13px; line-height: 1.6; }
+
+/* ── 히스토리 선택 ── */
+.hist-scroll {
+  display: flex; gap: 8px; overflow-x: auto;
+  scrollbar-width: none; padding-bottom: 4px; margin-bottom: 14px;
+}
+.hist-scroll::-webkit-scrollbar { display: none; }
+.hist-chip {
+  flex-shrink: 0; padding: 7px 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; font-size: 12px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.hist-chip.active { background: var(--acc); border-color: var(--acc); color: #fff; }
+.hist-chip .hw { font-size: 10px; opacity: 0.7; margin-left: 2px; }
+
+.delete-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 10px; font-size: 12px;
+  color: var(--text3); cursor: pointer; margin-left: 8px;
+}
+.delete-btn:hover { border-color: var(--skt); color: var(--skt); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">개통<em>현황</em></div>
+  <div class="date-disp" id="dateDisp" onclick="openCal()">날짜</div>
+</header>
+
+<!-- 날짜 모달 -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeCal()">
+  <div class="modal">
+    <div class="cal-nav">
+      <button onclick="moveMonth(-1)">◀</button>
+      <div class="cal-month" id="calMonth"></div>
+      <button onclick="moveMonth(1)">▶</button>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-wd">일</div><div class="cal-wd">월</div><div class="cal-wd">화</div>
+      <div class="cal-wd">수</div><div class="cal-wd">목</div><div class="cal-wd">금</div>
+      <div class="cal-wd">토</div>
+    </div>
+    <div class="cal-grid" id="calDays"></div>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('input')">✏️ 입력</div>
+  <div class="tab" onclick="switchTab('result')">📊 오늘</div>
+  <div class="tab" onclick="switchTab('predict')">🎯 예측</div>
+  <div class="tab" onclick="switchTab('avg')">📈 평균</div>
+</div>
+
+<main>
+  <!-- 입력 탭 -->
+  <div id="tab-input" class="tab-pane active">
+    <div id="slotCards"></div>
+  </div>
+
+  <!-- 결과 탭 -->
+  <div id="tab-result" class="tab-pane">
+    <div class="section-label" style="margin-top:4px">날짜 선택</div>
+    <div class="hist-scroll" id="histScroll"></div>
+    <div id="resultContent"></div>
+  </div>
+
+  <!-- 예측 탭 -->
+  <div id="tab-predict" class="tab-pane">
+    <div id="predictContent"></div>
+  </div>
+
+  <!-- 요일 평균 탭 -->
+  <div id="tab-avg" class="tab-pane">
+    <div id="avgContent"></div>
+  </div>
+</main>
+
+<script>
+// ── 상수 ──────────────────────────────────────────────
+const SLOTS = ['12:00','14:00','16:00','18:00','최종'];
+const SLOT_LABEL = {'12:00':'12시','14:00':'14시','16:00':'16시','18:00':'18시','최종':'마감'};
+const WEEKDAYS_KR = ['일','월','화','수','목','금','토'];
+const WD_SHORT = ['일','월','화','수','목','금','토'];
+
+// 수요일 예측값 (이상치 제외 평균, 오늘 5/20 반영 보정)
+const PRED_BY_WD = {
+  '수': {
+    '12:00': { skt:136, kt:97,  up:62,  mvno:1, total:291 },
+    '14:00': { skt:256, kt:181, up:117, mvno:2, total:566 },
+    '16:00': { skt:400, kt:282, up:187, mvno:4, total:885 },
+    '18:00': { skt:550, kt:376, up:261, mvno:5, total:1240 },
+    '최종':  { skt:616, kt:446, up:301, mvno:6, total:1421 },
+  },
+  '월': {
+    '12:00': { skt:114, kt:80,  up:51,  mvno:1, total:247 },
+    '14:00': { skt:220, kt:155, up:98,  mvno:2, total:477 },
+    '16:00': { skt:348, kt:242, up:158, mvno:3, total:754 },
+    '18:00': { skt:482, kt:334, up:219, mvno:4, total:1042 },
+    '최종':  { skt:542, kt:385, up:253, mvno:5, total:1188 },
+  },
+  '화': {
+    '12:00': { skt:124, kt:87,  up:56,  mvno:1, total:269 },
+    '14:00': { skt:240, kt:168, up:107, mvno:2, total:519 },
+    '16:00': { skt:378, kt:262, up:172, mvno:3, total:817 },
+    '18:00': { skt:524, kt:362, up:238, mvno:5, total:1132 },
+    '최종':  { skt:590, kt:416, up:274, mvno:5, total:1292 },
+  },
+  '목': {
+    '12:00': { skt:128, kt:90,  up:57,  mvno:1, total:277 },
+    '14:00': { skt:248, kt:174, up:111, mvno:2, total:537 },
+    '16:00': { skt:391, kt:272, up:178, mvno:3, total:847 },
+    '18:00': { skt:541, kt:374, up:245, mvno:5, total:1168 },
+    '최종':  { skt:608, kt:431, up:284, mvno:6, total:1336 },
+  },
+  '금': {
+    '12:00': { skt:138, kt:97,  up:62,  mvno:1, total:299 },
+    '14:00': { skt:268, kt:188, up:120, mvno:2, total:580 },
+    '16:00': { skt:422, kt:294, up:193, mvno:4, total:915 },
+    '18:00': { skt:581, kt:403, up:264, mvno:5, total:1256 },
+    '최종':  { skt:650, kt:465, up:305, mvno:6, total:1432 },
+  },
+};
+
+// ── 스토리지 ───────────────────────────────────────────
+const STORE_KEY = 'gaetong_v2';
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
+
+let DB = loadData();
+let selectedDate = todayStr();
+let calYear, calMonth;
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getWd(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return WD_SHORT[d.getDay()];
+}
+function formatDate(dateStr) {
+  const [y,m,dd] = dateStr.split('-');
+  return `${+m}/${+dd}(${getWd(dateStr)})`;
+}
+
+// ── 캘린더 ────────────────────────────────────────────
+function openCal() {
+  const d = new Date(selectedDate+'T00:00:00');
+  calYear = d.getFullYear(); calMonth = d.getMonth();
+  renderCal(); document.getElementById('modalBg').classList.add('open');
+}
+function closeCal() { document.getElementById('modalBg').classList.remove('open'); }
+function moveMonth(dir) { calMonth += dir; if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;} renderCal(); }
+function renderCal() {
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('calMonth').textContent = `${calYear}년 ${months[calMonth]}`;
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const last  = new Date(calYear, calMonth+1, 0).getDate();
+  const today = todayStr();
+  let html = '';
+  for (let i=0; i<first; i++) html += `<div class="cal-day empty"></div>`;
+  for (let d=1; d<=last; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSel = ds===selectedDate, isToday = ds===today;
+    html += `<div class="cal-day ${isSel?'selected':''} ${isToday?'today':''}" onclick="selectDate('${ds}')">${d}</div>`;
+  }
+  document.getElementById('calDays').innerHTML = html;
+}
+function selectDate(ds) {
+  selectedDate = ds;
+  document.getElementById('dateDisp').textContent = formatDate(ds);
+  closeCal(); renderInput(); renderHistScroll(); renderResult(ds); renderPredict();
+}
+
+// ── 탭 전환 ───────────────────────────────────────────
+function switchTab(name) {
+  const names = ['input','result','predict','avg'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name==='result') { renderHistScroll(); renderResult(selectedDate); }
+  if (name==='predict') renderPredict();
+  if (name==='avg') renderAvg();
+}
+
+// ── 입력 렌더링 ───────────────────────────────────────
+function renderInput() {
+  const wd = getWd(selectedDate);
+  const dayData = DB[selectedDate] || {};
+  let html = '';
+  for (const slot of SLOTS) {
+    const d = dayData[slot] || {};
+    const hasData = d.skt||d.kt||d.up;
+    const total = (d.skt||0)+(d.kt||0)+(d.up||0)+(d.mvno||0);
+    const isFinal = slot==='최종';
+    html += `<div class="slot-card ${hasData?'has-data':''} ${isFinal?'final':''} ${slot==='12:00'?'open':''}" id="card-${slot.replace(':','')}">
+      <div class="slot-header" onclick="toggleCard('${slot.replace(':','')}')">
+        <div class="slot-time">${SLOT_LABEL[slot]}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${hasData?`<div class="slot-total">${total.toLocaleString()}</div>`:''}
+          <div class="slot-arrow">▼</div>
+        </div>
+      </div>
+      <div class="slot-body">
+        <div class="input-grid">
+          <div class="input-group">
+            <label class="input-label lbl-skt">SKT</label>
+            <input class="num-input" type="number" inputmode="numeric" placeholder="0"
+              id="in-${slot}-skt" value="${d.skt||''}"
+              oninput="calcAuto('${slot}')" onchange="autoSave('${slot}')">
+          </div>
+          <div class="input-group">
+            <label class="input-label lbl-kt">KT</label>
+            <input class="num-input" type="number" inputmode="numeric" placeholder="0"
+              id="in-${slot}-kt" value="${d.kt||''}"
+              oninput="calcAuto('${slot}')" onchange="autoSave('${slot}')">
+          </div>
+          <div class="input-group">
+            <label class="input-label lbl-up">U+</label>
+            <input class="num-input" type="number" inputmode="numeric" placeholder="0"
+              id="in-${slot}-up" value="${d.up||''}"
+              oninput="calcAuto('${slot}')" onchange="autoSave('${slot}')">
+          </div>
+          <div class="input-group">
+            <label class="input-label lbl-mvno">MVNO</label>
+            <input class="num-input" type="number" inputmode="numeric" placeholder="0"
+              id="in-${slot}-mvno" value="${d.mvno||''}"
+              oninput="calcAuto('${slot}')" onchange="autoSave('${slot}')">
+          </div>
+          <div class="auto-total">
+            <span class="auto-label">자동 합계</span>
+            <span class="auto-val" id="auto-${slot}">
+              ${hasData ? total.toLocaleString() : '-'}
+            </span>
+          </div>
+        </div>
+        <button class="save-btn" onclick="saveSlot('${slot}')">저장</button>
+      </div>
+    </div>`;
+  }
+  document.getElementById('slotCards').innerHTML = html;
+}
+
+function toggleCard(id) {
+  const card = document.getElementById('card-'+id);
+  card.classList.toggle('open');
+}
+
+function calcAuto(slot) {
+  const skt  = +document.getElementById(`in-${slot}-skt`)?.value  || 0;
+  const kt   = +document.getElementById(`in-${slot}-kt`)?.value   || 0;
+  const up   = +document.getElementById(`in-${slot}-up`)?.value   || 0;
+  const mvno = +document.getElementById(`in-${slot}-mvno`)?.value || 0;
+  const tot  = skt+kt+up+mvno;
+  const el   = document.getElementById(`auto-${slot}`);
+  if (el) el.textContent = tot > 0 ? tot.toLocaleString() : '-';
+}
+
+function saveSlot(slot) {
+  const skt  = +document.getElementById(`in-${slot}-skt`)?.value  || 0;
+  const kt   = +document.getElementById(`in-${slot}-kt`)?.value   || 0;
+  const up   = +document.getElementById(`in-${slot}-up`)?.value   || 0;
+  const mvno = +document.getElementById(`in-${slot}-mvno`)?.value || 0;
+  if (!skt && !kt && !up) return;
+  if (!DB[selectedDate]) DB[selectedDate] = {};
+  DB[selectedDate][slot] = { skt, kt, up, mvno };
+  saveData(DB);
+  renderInput();
+  showToast(`${SLOT_LABEL[slot]} 저장 완료 ✓`);
+}
+
+function autoSave(slot) { saveSlot(slot); }
+
+// ── 히스토리 스크롤 ────────────────────────────────────
+function renderHistScroll() {
+  const dates = Object.keys(DB).sort().reverse();
+  const el = document.getElementById('histScroll');
+  if (!dates.length) { el.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:4px 0">저장된 데이터 없음</div>'; return; }
+  el.innerHTML = dates.map(ds => `
+    <div class="hist-chip ${ds===selectedDate?'active':''}" onclick="selectHistDate('${ds}')">
+      ${formatDate(ds)}
+    </div>`).join('');
+}
+
+function selectHistDate(ds) {
+  selectedDate = ds;
+  document.getElementById('dateDisp').textContent = formatDate(ds);
+  renderHistScroll(); renderResult(ds);
+}
+
+// ── 결과 렌더링 ───────────────────────────────────────
+function renderResult(ds) {
+  const dayData = DB[ds] || {};
+  const hasAny = Object.keys(dayData).length > 0;
+  const wd = getWd(ds);
+  const pred = PRED_BY_WD[wd] || {};
+
+  if (!hasAny) {
+    document.getElementById('resultContent').innerHTML = `
+      <div class="empty"><div class="empty-icon">📭</div><p>${formatDate(ds)} 데이터가 없습니다<br>입력 탭에서 실적을 입력하세요</p></div>`;
+    return;
+  }
+
+  // 마감 기준 요약
+  const final = dayData['최종'] || dayData['18:00'];
+  let html = '';
+  if (final) {
+    const tot = (final.skt||0)+(final.kt||0)+(final.up||0)+(final.mvno||0);
+    html += `<div class="summary-row">
+      <div class="s-card skt"><div class="s-lbl">SKT</div><div class="s-val">${(final.skt||0).toLocaleString()}</div></div>
+      <div class="s-card kt"><div class="s-lbl">KT</div><div class="s-val">${(final.kt||0).toLocaleString()}</div></div>
+      <div class="s-card up"><div class="s-lbl">U+</div><div class="s-val">${(final.up||0).toLocaleString()}</div></div>
+      <div class="s-card tot wide"><div class="s-lbl">총합계 (${dayData['최종']?'마감':'18시 기준'})</div>
+        <div class="s-val">${tot.toLocaleString()}</div>
+        <div class="s-sub">MVNO ${final.mvno||0}</div>
+      </div></div>`;
+  }
+
+  html += `<div class="section-label">시간대별 실적</div><div class="timeline">`;
+  for (const slot of SLOTS) {
+    const d = dayData[slot];
+    if (!d) continue;
+    const tot = (d.skt||0)+(d.kt||0)+(d.up||0)+(d.mvno||0);
+    const isFinal = slot==='최종';
+    const maxV = Math.max(d.skt||0, d.kt||0, d.up||0, 1);
+
+    // 예측 배지
+    let badge = '';
+    if (pred[slot]) {
+      const diff = tot - pred[slot].total;
+      const pct  = Math.round(diff / pred[slot].total * 100);
+      if (Math.abs(pct) >= 1) {
+        const cls  = diff>0?'diff-pos':'diff-neg';
+        const sign = diff>0?'+':'';
+        badge = `<span class="diff-badge ${cls}">${sign}${pct}%</span>`;
+      }
+    }
+
+    html += `<div class="tl-row ${isFinal?'final':''}">
+      <div class="tl-time">${SLOT_LABEL[slot]}</div>
+      <div class="tl-body">
+        <div class="tl-total">${tot.toLocaleString()}${badge}</div>
+        <div class="bar-row">
+          <div class="bar-lbl" style="color:var(--skt)">SKT</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((d.skt||0)/maxV*100)}%;background:var(--skt)"></div></div>
+          <div class="bar-num">${d.skt||0}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-lbl" style="color:var(--kt)">KT</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((d.kt||0)/maxV*100)}%;background:var(--kt)"></div></div>
+          <div class="bar-num">${d.kt||0}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-lbl" style="color:var(--up)">U+</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((d.up||0)/maxV*100)}%;background:var(--up)"></div></div>
+          <div class="bar-num">${d.up||0}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('resultContent').innerHTML = html;
+}
+
+// ── 예측 렌더링 ───────────────────────────────────────
+function renderPredict() {
+  const wd = getWd(selectedDate);
+  const pred = PRED_BY_WD[wd];
+  const dayData = DB[selectedDate] || {};
+  let html = `<div class="section-label" style="margin-top:4px">${formatDate(selectedDate)} — ${wd}요일 예측</div>`;
+
+  if (!pred) {
+    html += `<div class="empty"><div class="empty-icon">📊</div><p>주말은 예측 데이터가 없습니다</p></div>`;
+    document.getElementById('predictContent').innerHTML = html;
+    return;
+  }
+
+  for (const slot of ['12:00','14:00','16:00','18:00','최종']) {
+    const p = pred[slot];
+    const actual = dayData[slot];
+    const actualTot = actual ? (actual.skt||0)+(actual.kt||0)+(actual.up||0)+(actual.mvno||0) : null;
+
+    html += `<div class="pred-card">
+      <div class="pred-header">
+        <div class="pred-slot">${SLOT_LABEL[slot]}</div>
+        <div class="pred-total">${p.total.toLocaleString()}</div>
+      </div>
+      <div class="pred-body">`;
+
+    if (actualTot !== null) {
+      const diff = actualTot - p.total;
+      const pct  = Math.round(diff/p.total*100);
+      const sign = diff>0?'+':'';
+      html += `<div class="big-compare">
+        <div class="bc-item pred"><div class="bc-lbl">예측</div><div class="bc-val">${p.total.toLocaleString()}</div></div>
+        <div class="bc-item actual"><div class="bc-lbl">실제</div><div class="bc-val">${actualTot.toLocaleString()}</div></div>
+      </div>
+      <div style="text-align:center;margin-bottom:10px;font-size:13px">
+        오차 <strong style="font-family:JetBrains Mono;color:${diff>0?'var(--skt)':'var(--up)'}">${sign}${diff.toLocaleString()} (${sign}${pct}%)</strong>
+      </div>`;
+    }
+
+    html += `<div class="pred-compare">
+      <div class="pc-item">
+        <div class="pc-lbl" style="color:var(--skt)">SKT</div>
+        <div class="pc-pred">${p.skt}</div>
+        ${actual ? `<div class="pc-actual" style="color:var(--skt)">${actual.skt||0}</div>
+          <div class="pc-diff ${(actual.skt||0)>p.skt?'pos':'neg'}">${(actual.skt||0)>p.skt?'+':''}${(actual.skt||0)-p.skt}</div>` : ''}
+      </div>
+      <div class="pc-item">
+        <div class="pc-lbl" style="color:var(--kt)">KT</div>
+        <div class="pc-pred">${p.kt}</div>
+        ${actual ? `<div class="pc-actual" style="color:var(--kt)">${actual.kt||0}</div>
+          <div class="pc-diff ${(actual.kt||0)>p.kt?'pos':'neg'}">${(actual.kt||0)>p.kt?'+':''}${(actual.kt||0)-p.kt}</div>` : ''}
+      </div>
+      <div class="pc-item">
+        <div class="pc-lbl" style="color:var(--up)">U+</div>
+        <div class="pc-pred">${p.up}</div>
+        ${actual ? `<div class="pc-actual" style="color:var(--up)">${actual.up||0}</div>
+          <div class="pc-diff ${(actual.up||0)>p.up?'pos':'neg'}">${(actual.up||0)>p.up?'+':''}${(actual.up||0)-p.up}</div>` : ''}
+      </div>
+    </div>
+    ${!actual ? `<div class="no-actual">실적 입력 시 예측과 비교됩니다</div>` : ''}
+    </div></div>`;
+  }
+
+  document.getElementById('predictContent').innerHTML = html;
+}
+
+// ── 요일 평균 렌더링 ──────────────────────────────────
+let selWd = getWd(todayStr());
+function renderAvg() {
+  const wds = ['월','화','수','목','금','토','일'];
+  let html = `<div class="wd-tabs">`;
+  for (const wd of wds) {
+    const isSat=wd==='토', isSun=wd==='일';
+    html += `<div class="wd-chip ${wd===selWd?'active':''} ${isSat?'sat':''} ${isSun?'sun':''}" onclick="selectWd('${wd}')">${wd}요일</div>`;
+  }
+  html += '</div>';
+
+  // 선택 요일 시간대별 평균
+  const avgData = computeWdAvg(selWd);
+  html += `<div class="section-label">${selWd}요일 평균 (입력 데이터 기준)</div>`;
+  for (const slot of SLOTS) {
+    const d = avgData[slot];
+    if (!d || !d.total) continue;
+    html += `<div class="avg-slot-row">
+      <div class="avg-slot-left">
+        <div class="avg-slot-time">${SLOT_LABEL[slot]}</div>
+        <div class="avg-n">${d.n}일 평균</div>
+      </div>
+      <div>
+        <div class="avg-total">${d.total.toLocaleString()}</div>
+        <div class="avg-carriers">
+          <span class="avg-c" style="color:var(--skt)">SKT ${d.skt}</span>
+          <span class="avg-c" style="color:var(--kt)">KT ${d.kt}</span>
+          <span class="avg-c" style="color:var(--up)">U+ ${d.up}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (!Object.values(avgData).some(d=>d?.total)) {
+    html += `<div class="empty"><div class="empty-icon">📭</div><p>${selWd}요일 데이터가 없습니다<br>실적 입력 후 평균이 계산됩니다</p></div>`;
+  }
+
+  // 전체 요일 마감 비교
+  html += `<div class="section-label">요일별 마감 비교</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px">`;
+  const allAvgs = {};
+  for (const wd of wds) allAvgs[wd] = computeWdAvg(wd)['최종']?.total || 0;
+  const maxV = Math.max(...Object.values(allAvgs), 1);
+  for (const wd of wds) {
+    const v = allAvgs[wd];
+    const n = computeWdAvg(wd)['최종']?.n || 0;
+    const isSel = wd===selWd;
+    html += `<div class="wd-compare-row" style="${isSel?'background:var(--acc2)':''}">
+      <div class="wc-wd" style="color:${wd==='토'?'var(--kt)':wd==='일'?'var(--skt)':isSel?'var(--acc)':'var(--text2)'}">${wd}</div>
+      <div class="wc-bar-bg"><div class="wc-bar" style="width:${Math.round(v/maxV*100)}%;background:${isSel?'var(--acc)':'var(--text3)'}"></div></div>
+      <div class="wc-val" style="color:${isSel?'var(--acc)':'var(--text)'}">${v?v.toLocaleString():'-'}</div>
+      <div class="wc-n">${n}일</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // 예측 참고값 안내
+  html += `<div class="section-label">예측 참고값 (카톡 데이터 기반)</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px">`;
+  const predForWd = PRED_BY_WD[selWd];
+  if (predForWd) {
+    for (const slot of ['12:00','14:00','16:00','18:00','최종']) {
+      const p = predForWd[slot];
+      html += `<div class="wd-compare-row">
+        <div class="wc-wd" style="color:var(--acc);font-size:11px">${SLOT_LABEL[slot]}</div>
+        <div style="flex:1;font-size:11px;color:var(--text2)">
+          SKT ${p.skt} · KT ${p.kt} · U+ ${p.up}
+        </div>
+        <div class="wc-val">${p.total.toLocaleString()}</div>
+      </div>`;
+    }
+  } else {
+    html += `<div class="no-actual">주말은 예측값 없음</div>`;
+  }
+  html += '</div>';
+
+  document.getElementById('avgContent').innerHTML = html;
+}
+
+function selectWd(wd) { selWd=wd; renderAvg(); }
+
+// ── 내 입력 데이터 기반 평균 ──────────────────────────
+function computeWdAvg(wd) {
+  const result = {};
+  const dates = Object.keys(DB).filter(ds => getWd(ds)===wd);
+  for (const slot of SLOTS) {
+    const vals = dates.map(ds => DB[ds]?.[slot]).filter(Boolean);
+    if (!vals.length) { result[slot] = null; continue; }
+    result[slot] = {
+      skt:   Math.round(vals.reduce((a,v)=>a+(v.skt||0),0)/vals.length),
+      kt:    Math.round(vals.reduce((a,v)=>a+(v.kt||0),0)/vals.length),
+      up:    Math.round(vals.reduce((a,v)=>a+(v.up||0),0)/vals.length),
+      mvno:  Math.round(vals.reduce((a,v)=>a+(v.mvno||0),0)/vals.length),
+      total: Math.round(vals.reduce((a,v)=>a+(v.skt||0)+(v.kt||0)+(v.up||0)+(v.mvno||0),0)/vals.length),
+      n: vals.length,
+    };
+  }
+  return result;
+}
+
+// ── 토스트 알림 ───────────────────────────────────────
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      background:var(--text);color:var(--bg);padding:10px 20px;border-radius:20px;
+      font-size:13px;font-weight:500;z-index:9999;transition:opacity 0.3s;white-space:nowrap`;
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity='0', 1800);
+}
+
+// ── 초기화 ────────────────────────────────────────────
+(function init() {
+  const today = todayStr();
+  selectedDate = today;
+  document.getElementById('dateDisp').textContent = formatDate(today);
+  const d = new Date(today+'T00:00:00');
+  calYear = d.getFullYear(); calMonth = d.getMonth();
+  selWd = getWd(today);
+  renderInput();
+  renderHistScroll();
+})();
+</script>
+</body>
+</html>
